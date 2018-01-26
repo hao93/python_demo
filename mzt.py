@@ -1,10 +1,11 @@
 # coding:utf-8
 import requests
 from lxml import html
-import os
+import os,threading,time
 from tqdm import *
 
 url = 'http://www.mzitu.com/page/{page}'
+
 # 获取主页列表
 def getPage(pagenum):
     baseUrl = url.format(page=pagenum)
@@ -12,14 +13,14 @@ def getPage(pagenum):
 
     urls = []
     for i in selector.xpath('//ul[@id="pins"]/li/a/@href'):
-        print i
+        print(i)
         urls.append(i)
     return urls
 
 # 图片链接列表，标题
 # url是详情页链接
 def getPiclink(url):
-    print url
+    print(url)
     sel = html.fromstring(requests.get(url).content)
     # 图片总数 倒数第二项里
     total = sel.xpath('//div[@class="pagenavi"]/a[last()-1]/span/text()')[0]
@@ -28,7 +29,7 @@ def getPiclink(url):
     # 接下来的链接放到这个列表
     jpgList = []
     desc = u'获取图片链接：%s' % (title)
-    print desc
+    print(desc)
     for i in range(int(total)):
         try:
             headers = {'Referer':'http://www.mzitu.com/99566/2'}
@@ -40,12 +41,13 @@ def getPiclink(url):
             # 图片链接放进列表
             jpgList.append(jpg)
         except:
-            a = 1
-    return title, jpgList
+            print('error download ...')
+    return [title, jpgList]
 
 # 下载图片
 # 因为上面函数返回的两个值，这里我们直接传入一个两个值tuple
-def downloadPic((title, piclist)):
+def downloadPic(title, piclist):
+    print('----------------->')
     k = 1
     # 图片数量
     count = len(piclist)
@@ -62,7 +64,7 @@ def downloadPic((title, piclist)):
     for i in piclist:
         # 文件写入的名称：当前路径／文件夹／文件名
         filename = '%s/pic/%s/%s.jpg' % (os.path.abspath('.'), dirName, k)
-        print u'开始下载图片:%s 第%s张' % (dirName, k)
+        print(u'开始下载图片:%s 第%s张' % (dirName, k))
 
         with open(filename, "wb") as jpg:
             jpg.write(requests.get(i, headers=headers).content)
@@ -72,10 +74,21 @@ def downloadPic((title, piclist)):
 
 
 if __name__ == '__main__':
-    # pageNum = input(u'请输入页码：')
-    for i in range(41, 149):
+    # task_pool=threadpool.ThreadPool(8)#8是线程池中线程的个数
+    for i in range(1, 1000):
+        threads = []
         for link in getPage(i):
             try:
-                downloadPic(getPiclink(link))
+                queue_list = []
+                jpgList = getPiclink(link)
+                # downloadPic(jpgList[0], jpgList[1])
+                t = threading.Thread(target=downloadPic, name=jpgList[0], args=(jpgList[0],jpgList[1]))
+                threads.append(t)
+                # queue_list.append(threadpool.makeRequests(downloadPic, jpgList))
+                # map(task_pool.putRequest,queue_list)
+                t.start()
             except:
                 a = 1
+    t.join()
+    time.sleep(10000)
+    # task_pool.poll()
